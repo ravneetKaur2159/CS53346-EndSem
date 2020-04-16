@@ -1,246 +1,135 @@
 // set the dimensions and margins of the graph
-var margin = {top: 30, right: 30, bottom: 60, left: 30},
-  width = 850 - margin.left - margin.right,
-  height = 650 - margin.top - margin.bottom;
+var margin = {top: 30, right: 30, bottom: 70, left: 60},
+  width = 1050 - margin.left - margin.right,
+  height = 550 - margin.top - margin.bottom;
 
 // append the svg object to the body of the page
-var svg = d3.select("#my_dataviz")
+
+function dateConverter(dateString){
+  return dateString.substring(0,4)+"-"+dateString.substring(4,6)+"-"+dateString.substring(6,8);
+}
+
+
+var svgFinal = d3.select("#attempt")
 .append("svg")
   .attr("width", width + margin.left + margin.right)
   .attr("height", height + margin.top + margin.bottom)
-  .style("border", "solid black") // <<---- remove border in final graph
+  // .style("border", "solid black") // <<---- remove border in final graph
 .append("g")
   .attr("transform",
         "translate(" + margin.left + "," + margin.top + ")");
 
-d3.csv("https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/data_connectedscatter.csv").then(function(data) {
+d3.csv("data/DATASET-4.csv").then(function(data){
+    // List of subgroups = header of the csv files = soil condition here
+  console.log(data)
+  groups = [];
+  dataReadyMaster = [];
+  subgroups = ["mild", "serious", "critical"];
+//     dataReady={};
 
-    // List of groups (here I have one group per column)
-    var allGroup = ["valueA", "valueB", "valueC"]
+    for(var i = 0;i<data.length;i++){
+      elementObj = {};
+      elementObj["group"]=dateConverter(data[i]["date"]);
 
-    // Reformat the data: we need an array of arrays of {x, y} tuples
-    var dataReady = allGroup.map( function(grpName) { // .map allows to do something for each element of the list
-      return {
-        name: grpName,
-        values: data.map(function(d) {
-          return {time: d.time, value: +d[grpName]};
-        })
-      };
-    });
-    // I strongly advise to have a look to dataReady with
-    // console.log(dataReady)
+      // setting mild cases
+      if(data[i]["hospitalizedCurrently"] == ""){
+        elementObj["mild"] = 0;
+      }else{
+        elementObj["mild"]=parseInt(data[i]["hospitalizedCurrently"]);
+      }
+      
+      //setting serious
+      if(data[i]["inIcuCurrently"] == ""){
+        elementObj["serious"] = 0;
+      }else{
+        elementObj["serious"]=parseInt(data[i]["inIcuCurrently"]);
+      }
 
-    // A color scale: one color for each group
-    var myColor = d3.scaleOrdinal()
-      .domain(allGroup)
-      .range(d3.schemeSet2);
+      //setting critical
+      if(data[i]["onVentilatorCurrently"] == ""){
+        elementObj["critical"] = 0;
+      }else{
+        elementObj["critical"]=parseInt(data[i]["onVentilatorCurrently"]);
+      }
 
-    // Add X axis --> it is a date format
-    var x = d3.scaleLinear()
-      .domain([0,10])
-      .range([ 0, width ]);
-    svg.append("g")
-      .attr("transform", "translate(0," + height + ")")
-      .call(d3.axisBottom(x));
+      groups.unshift(dateConverter(data[i]["date"]));
+      dataReadyMaster.unshift(elementObj);
+    }
 
-    // Add Y axis
-    var y = d3.scaleLinear()
-      .domain( [0,20])
-      .range([ height, 0 ]);
-    svg.append("g")
-      .call(d3.axisLeft(y));
+    console.log(dataReadyMaster);
 
-    // Add the lines
-    var line = d3.line()
-      .x(function(d) { return x(+d.time) })
-      .y(function(d) { return y(+d.value) })
-    svg.selectAll("myLines")
-      .data(dataReady)
-      .enter()
-      .append("path")
-        .attr("d", function(d){ return line(d.values) } )
-        .attr("stroke", function(d){ return myColor(d.name) })
-        .style("stroke-width", 4)
-        .style("fill", "none")
+ 
+  //Add X axis
+  var x = d3.scaleBand()
+      .domain(groups)
+      .range([0, width])
+      .padding([0.2])
 
-    // Add the points
-    svg
-      // First we need to enter in a group
-      .selectAll("myDots")
-      .data(dataReady)
-      .enter()
-        .append('g')
-        .style("fill", function(d){ return myColor(d.name) })
-      // Second we need to enter in the 'values' part of this group
-      .selectAll("myPoints")
-      .data(function(d){ return d.values })
-      .enter()
-      .append("circle")
-        .attr("cx", function(d) { return x(d.time) } )
-        .attr("cy", function(d) { return y(d.value) } )
-        .attr("r", 5)
-        .attr("stroke", "white")
+  svgFinal.append("g")
+    .attr("transform", "translate(0," + height + ")")
+    .call(d3.axisBottom(x).tickSizeOuter(0))
+    .selectAll("text")
+    .attr("transform", "translate(-10,10)rotate(-70)")
+    .style("text-anchor", "end")
+    .style("font-size", 10)
+    .style("fill", "#69a3b2");
 
-    // Add a legend at the end of each line
-    svg
-      .selectAll("myLabels")
-      .data(dataReady)
-      .enter()
-        .append('g')
-        .append("text")
-          .datum(function(d) { return {name: d.name, value: d.values[d.values.length - 1]}; }) // keep only the last value of each time series
-          .attr("transform", function(d) { return "translate(" + x(d.value.time) + "," + y(d.value.value) + ")"; }) // Put the text at the position of the last point
-          .attr("x", 12) // shift the text a bit more right
-          .text(function(d) { return d.name; })
-          .style("fill", function(d){ return myColor(d.name) })
-          .style("font-size", 15)
+  // Add Y axis
+  var y = d3.scaleLinear()
+    .domain([0, 70000])
+    .range([ height, 0 ]);
+    svgFinal.append("g")
+    .call(d3.axisLeft(y));
 
+//   // color palette = one color per subgroup
+  var color = d3.scaleOrdinal()
+    .domain(subgroups) // array of categorical values
+    .range(d3.schemeSet2)
+
+//   //stack the data? --> stack per subgroup
+  var stackedData = d3.stack()
+    .keys(subgroups)
+    (dataReadyMaster)
+
+
+// // //   // Show the bars
+svgFinal.append("g")
+    .selectAll("g")
+    // Enter in the stack data = loop key per key = group per group
+    .data(stackedData)
+    .enter().append("g")
+      .attr("fill", function(d) { return color(d.key); })
+      .selectAll("rect")
+      // enter a second time = loop subgroup per subgroup to add all rectangles
+      .data(function(d) { return d; })
+      .enter().append("rect")
+        .attr("x", function(d) { return x(d.data["group"]); })
+        .attr("y", function(d) { return y(d[1]); })
+        .attr("height", function(d) { return y(d[0]) - y(d[1]); })
+        .attr("width",x.bandwidth())
 });
 
 
-function checkFormatDate(dateString){
-  if(dateString.includes("/")){
-    return dateString;
-  }
-  else{
-    dateParts;
-  }
+var svgLegendMild = d3.select("#legendMild").append("svg").attr("width", 12).attr("height", 20)
+svgLegendMild.append('rect')
+  .attr('x', 5)
+  .attr('y', 5)
+  .attr('width', 10)
+  .attr('height', 10)
+  .attr('fill', "#66c2a5");
 
-}
+var svgLegendSerious = d3.select("#legendSerious").append("svg").attr("width", 12).attr("height", 20)
+svgLegendSerious.append('rect')
+    .attr('x', 5)
+    .attr('y', 5)
+    .attr('width', 10)
+    .attr('height', 10)
+    .attr('fill', "#fc8d62");
 
-
-var svgExam = d3.select("#exam")
-.append("svg")
-.attr("width", width + margin.left + margin.right)
-.attr("height", height + margin.top + margin.bottom)
-.style("border", "solid black") // <<---- remove border in final graph
-.append("g")
-.attr("transform",
-      "translate(" + margin.left + "," + margin.top + ")");
-
-      d3.csv("data/dummy_dataset4 -exam.csv").then(function(data) {
-        console.log(data);
-        
-        allGroup = [];
-        dataReadyMaster = [];
-        
-
-        for(var i = 0;i<data.length;i++){
-          dataReady = {};
-          xTicksValues = [];
-          dataReady["name"] = data[i]["Country/Region"];
-          allGroup.push(data[i]["Country/Region"]);
-          keyList = [];
-          keyList = Object.keys(data[i]);
-          valuesList = Object.values(data[i]);
-          valueObj = [];
-          
-          for(var j = 4; j<keyList.length;j++){
-            elementObj = {};
-            elementObj["time"] = j;
-            xTicksValues.push(keyList[j]);  // check this
-            elementObj["value"] = valuesList[j];
-            valueObj.push(elementObj);
-          }
-          dataReady["values"] = valueObj;
-          dataReadyMaster.push(dataReady);
-        }
-
-      
-          // A color scale: one color for each group
-          var myColor = d3.scaleOrdinal()
-            .domain(allGroup)
-            .range(d3.schemeSet2);
-      
-          // Add X axis --> it is a date format
-          var x = d3.scaleLinear()
-            .domain([0,82])
-            .range([ 0, width ]);
-
-          svgExam.append("g")
-            .attr("transform", "translate(0," + height + ")")
-            .call(d3.axisBottom(x).ticks(80).tickFormat(function(d, i){ return xTicksValues[i]}))
-            .selectAll("text")
-              .attr("transform", "translate(-10,10)rotate(-70)")
-              .style("text-anchor", "end")
-              .style("font-size", 10)
-              .style("fill", "#69a3b2");
-      
-          // Add Y axis
-          var y = d3.scaleLinear()
-            .domain( [0,570])
-            .range([ height, 0 ]);
-            svgExam.append("g")
-            .call(d3.axisLeft(y));
-      
-          // Add the lines
-          var line = d3.line()
-            .x(function(d) { 
-              return x(+d.time) 
-            })
-            .y(function(d) { 
-              return y(+d.value) 
-            })
-            svgExam.selectAll("myLines")
-            .data(dataReadyMaster)
-            .enter()
-            .append("path")
-              .attr("id", function(d, i) {return i})
-              .attr("d", function(d){ return line(d.values) } )
-              //.attr("stroke", function(d){ return myColor(d.name) })
-              .attr("stroke", function(d){ return "#dddddd" })
-              .style("stroke-width", 2)
-              .style("fill", "none")
-              .on("mouseover", handleMouseOver)
-              .on("mouseout", handleMouseOut);
-
-
-          function handleMouseOver(){
-            element = d3.select(this);
-
-            element
-            .attr("stroke", "red" );
-            
-          }
-
-          function handleMouseOut(){
-            element = d3.select(this);
-
-            element
-            .attr("stroke", "#dddddd" );
-          }
-          // Add the points
-          // svgExam
-          //   // First we need to enter in a group
-          //   .selectAll("myDots")
-          //   .data(dataReady)
-          //   .enter()
-          //     .append('g')
-          //     .style("fill", function(d){ return myColor(d.name) })
-          //   // Second we need to enter in the 'values' part of this group
-          //   .selectAll("myPoints")
-          //   .data(function(d){ return d.values })
-          //   .enter()
-          //   .append("circle")
-          //     .attr("cx", function(d) { return x(d.time) } )
-          //     .attr("cy", function(d) { return y(d.value) } )
-          //     .attr("r", 5)
-          //     .attr("stroke", "white")
-      
-          // // Add a legend at the end of each line
-          // svgExam
-          //   .selectAll("myLabels")
-          //   .data(dataReady)
-          //   .enter()
-          //     .append('g')
-          //     .append("text")
-          //       .datum(function(d) { return {name: d.name, value: d.values[d.values.length - 1]}; }) // keep only the last value of each time series
-          //       .attr("transform", function(d) { return "translate(" + x(d.value.time) + "," + y(d.value.value) + ")"; }) // Put the text at the position of the last point
-          //       .attr("x", 12) // shift the text a bit more right
-          //       .text(function(d) { return d.name; })
-          //       .style("fill", function(d){ return myColor(d.name) })
-          //       .style("font-size", 15)
-      
-      })
-
-
+var svgLegendCritical = d3.select("#legendCritical").append("svg").attr("width", 12).attr("height", 20)
+svgLegendCritical.append('rect')
+  .attr('x', 5)
+  .attr('y', 5)
+  .attr('width', 10)
+  .attr('height', 10)
+  .attr('fill', "#8da0cb");
